@@ -1,6 +1,7 @@
 import operator
 import re
 
+from hypothesis import given, strategies as st
 import parsy
 import pytest
 
@@ -119,6 +120,10 @@ symbol_c = 'ccc'
 
 
 def get_col(str_):
+    """
+    Find position of first non-whitespace char in `str_`
+    """
+    # type: (str) -> int
     return re.search(r'[^\s]', str_).start()
 
 
@@ -127,24 +132,68 @@ sc = space(parsy.regex(r'( |\t)+').result(''))
 scn = space(char.space1)
 
 
-def test_indent_block():
-    whitespace_char = ' '
-    indent_level = 4
+@st.composite
+def make_indent_(draw, val, size):
+    """
+    Indent `val` by `size` using either space or tab, with random trailing
+    space or tab chars appended.
+    Will sometimes randomly ignore `size` param.
+    """
+    whitespace_char = st.text(' \t', min_size=1, max_size=1)
+    trailing = draw(st.text(draw(whitespace_char)))
+    indent = draw(st.one_of(
+        st.text(draw(whitespace_char), min_size=size, max_size=size),
+        st.text(draw(whitespace_char)),
+    ))
+    return ''.join([indent, val, trailing])
 
-    def make_indent_(val, size):
-        indent_str = whitespace_char * size
-        return ''.join([indent_str, val, whitespace_char])
 
-    def make_indent(val, size):
-        return make_indent_(val, size) + '\n'
+@st.composite
+def make_indent(draw, val, size):
+    """
+    Indent `val` by `size` using either space or tab, with random trailing
+    space or tab chars appended. Followed by one or more line breaks.
+    Will sometimes randomly ignore `size` param.
+    """
+    eol = draw(st.one_of(
+        st.text('\n', min_size=1, max_size=1),
+        st.text('\n', min_size=1),
+    ))
+    indented_val = draw(make_indent_(val, size))
+    return ''.join([indented_val, eol])
 
-    lines = [
-        make_indent(symbol_a, 0),
-        make_indent(symbol_b, indent_level),
-        make_indent(symbol_c, indent_level + 2),
-        make_indent(symbol_b, indent_level),
-        make_indent_(symbol_c, indent_level + 2)
-    ]
+
+@st.composite
+def _make_block(draw):
+    """
+    Helper strategy for `test_indent_block` case.
+
+    The shape of the content will be the same every time:
+    a
+        b
+          c
+        b
+          c
+
+    But the chars and size of indent, plus trailing whitespace on each line
+    and number of line breaks will all be fuzzed.
+    """
+    indent_level = draw(st.integers(min_value=1, max_value=10))
+    lines = (
+        draw(make_indent(symbol_a, 0)),
+        draw(make_indent(symbol_b, indent_level)),
+        draw(make_indent(symbol_c, indent_level + 2)),
+        draw(make_indent(symbol_b, indent_level)),
+        draw(make_indent_(symbol_c, indent_level + 2)),
+    )
+    return lines, indent_level
+
+
+@given(_make_block())
+def test_indent_block(block):
+
+    lines, indent_level = block
+
     cols = [get_col(l) for l in lines]
 
     lvlc = indent_block(
@@ -196,120 +245,3 @@ def test_indent_block():
                 (symbol_b, [symbol_c]),
             ]
         )
-
-r"""
-mkIndent :: String -> Int -> Gen String
-mkIndent x n = (++) <$> mkIndent' x n <*> eol
-  where
-    eol = frequency [(5, return "\n"), (1, (scaleDown . listOf1 . return) '\n')]
-
-mkIndent' :: String -> Int -> Gen String
-mkIndent' x n = concat <$> sequence [spc, sym, tra]
-  where
-    spc = frequency [(5, vectorOf n itm), (1, scaleDown (listOf itm))]
-    tra = scaleDown (listOf itm)
-    itm = elements " \t"
-    sym = return x
-
-scaleDown :: Gen a -> Gen a
-scaleDown = scale (`div` 4)
-
-scale :: (Int -> Int) -> Gen a -> Gen a Source#
--- "Adjust the size parameter, by transforming it with the given function."
-
-getCol :: String -> Pos
-getCol x = sourceColumn .
-  strSourcePos defaultTabWidth (initialPos "") $ takeWhile isSpace x
-
-describe "indentBlock" $ do
-    it "works as indented" $
-      property $ \mn'' -> do
-        let mkBlock = do
-              l0 <- mkIndent sbla 0
-              l1 <- mkIndent sblb ib
-              l2 <- mkIndent sblc (ib + 2)
-              l3 <- mkIndent sblb ib
-              l4 <- mkIndent' sblc (ib + 2)
-              return (l0,l1,l2,l3,l4)
-            ib  = fromMaybe 2 mn'
-            mn' = getSmall . getPositive <$> mn''
-            mn  = mkPos . fromIntegral <$> mn'
-
-        forAll mkBlock $ \(l0,l1,l2,l3,l4) -> do
-          let (col0, col1, col2, col3, col4) =
-                (getCol l0, getCol l1, getCol l2, getCol l3, getCol l4)
-              fragments = [l0,l1,l2,l3,l4]
-              g x = sum (length <$> take x fragments)
-              s = concat fragments
-              p = lvla <* eof
-              lvla = indentBlock scn $ IndentMany mn      (l sbla) lvlb <$ b sbla
-              lvlb = indentBlock scn $ IndentSome Nothing (l sblb) lvlc <$ b sblb
-              lvlc = indentBlock scn $ IndentNone                  sblc <$ b sblc
-              b    = symbol sc
-              l x  = return . (x,)
-              ib'  = mkPos (fromIntegral ib)
-          if | col1 <= col0 -> prs p s `shouldFailWith`
-               err (getIndent l1 + g 1) (utok (head sblb) <> eeof)
-             | isJust mn && col1 /= ib' -> prs p s `shouldFailWith`
-               errFancy (getIndent l1 + g 1) (ii EQ ib' col1)
-             | col2 <= col1 -> prs p s `shouldFailWith`
-               errFancy (getIndent l2 + g 2) (ii GT col1 col2)
-             | col3 == col2 -> prs p s `shouldFailWith`
-               err (getIndent l3 + g 3) (utoks sblb <> etoks sblc <> eeof)
-             | col3 <= col0 -> prs p s `shouldFailWith`
-               err (getIndent l3 + g 3) (utok (head sblb) <> eeof)
-             | col3 < col1 -> prs p s `shouldFailWith`
-               errFancy (getIndent l3 + g 3) (ii EQ col1 col3)
-             | col3 > col1 -> prs p s `shouldFailWith`
-               errFancy (getIndent l3 + g 3) (ii EQ col2 col3)
-             | col4 <= col3 -> prs p s `shouldFailWith`
-               errFancy (getIndent l4 + g 4) (ii GT col3 col4)
-             | otherwise -> prs p s `shouldParse`
-               (sbla, [(sblb, [sblc]), (sblb, [sblc])])
-    it "IndentMany works as intended (newline at the end)" $
-      property $ forAll ((<>) <$> mkIndent sbla 0 <*> mkWhiteSpaceNl) $ \s -> do
-        let p    = lvla
-            lvla = indentBlock scn $ IndentMany Nothing (l sbla) lvlb <$ b sbla
-            lvlb = b sblb
-            b    = symbol sc
-            l x  = return . (x,)
-        prs  p s `shouldParse` (sbla, [])
-        prs' p s `succeedsLeaving` ""
-    it "IndentMany works as intended (eof)" $
-      property $ forAll ((<>) <$> mkIndent sbla 0 <*> mkWhiteSpace) $ \s -> do
-        let p    = lvla
-            lvla = indentBlock scn $ IndentMany Nothing (l sbla) lvlb <$ b sbla
-            lvlb = b sblb
-            b    = symbol sc
-            l x  = return . (x,)
-        prs  p s `shouldParse` (sbla, [])
-        prs' p s `succeedsLeaving` ""
-    it "IndentMany works as intended (whitespace aligned precisely to the ref level)" $ do
-      let p    = lvla
-          lvla = indentBlock scn $ IndentMany Nothing (l sbla) lvlb <$ b sbla
-          lvlb = b sblb
-          b    = symbol sc
-          l x  = return . (x,)
-          s    = "aaa\n bbb\n "
-      prs  p s `shouldParse` (sbla, [sblb])
-      prs' p s `succeedsLeaving` ""
-    it "works with many and both IndentMany and IndentNone" $
-      property $ forAll ((<>) <$> mkIndent sbla 0 <*> mkWhiteSpaceNl) $ \s -> do
-        let p1   = indentBlock scn $ IndentMany Nothing (l sbla) lvlb <$ b sbla
-            p2   = indentBlock scn $ IndentNone sbla <$ b sbla
-            lvlb = b sblb
-            b    = symbol sc
-            l x  = return . (x,)
-        prs  (many p1) s `shouldParse` [(sbla, [])]
-        prs  (many p2) s `shouldParse` [sbla]
-        prs' (many p1) s `succeedsLeaving` ""
-        prs' (many p2) s `succeedsLeaving` ""
-    it "IndentSome expects the specified indentation level for first item" $ do
-      let s   = "aaa\n  bbb\n"
-          p   = indentBlock scn $
-            IndentSome (Just (mkPos 5)) (l sbla) lvlb <$ symbol sc sbla
-          lvlb = symbol sc sblb
-          l x = return . (x,)
-      prs p s `shouldFailWith` errFancy 6
-        (fancy $ ErrorIndentation EQ (mkPos 5) (mkPos 3))
-"""

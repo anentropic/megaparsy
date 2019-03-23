@@ -89,7 +89,7 @@ def non_indented(p_space_consumer, p_content):
 
 def _indented_items(reference_level, next_level, p_space_consumer, p_indented_tokens):
     """
-    Grab indented items. This is a helper for `indentBlock`, it's not a
+    Grab indented items. This is a helper for `indent_block`, it's not a
     part of the public API.
 
     Args:
