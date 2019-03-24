@@ -42,6 +42,18 @@ def get_col(str_):
     return re.search(r'[^\s]', str_).start()
 
 
+def get_indent(str_):
+    """
+    Find length of initial whitespace chars in `str_`
+    """
+    # type: (str) -> int
+    match = re.search(r'[^\s]|$', str_)
+    if match:
+        return match.start()
+    else:
+        return 0
+
+
 @st.composite
 def make_indent_(draw, val, size):
     """
@@ -105,24 +117,22 @@ def test_skip_line_comment():
     assert val == "\n"
 
 
-def test_non_indented():
+@given(make_indent(symbol_a, 0))
+def test_non_indented(s):
     """
     Returns the result of content-consuming parser if the start pos is indented
     else raises ParseError
     """
-    p = non_indented(space(), symbol('one'))
+    p = non_indented(scn, symbol(symbol_a, scn))
 
-    s = """
-one
-"""
-    val = p.parse(s)
-    assert val == 'one'
+    i = get_indent(s)
 
-    s = """
-    one
-"""
-    with pytest.raises(parsy.ParseError):
-        p.parse(s)
+    if i == 0:
+        val = p.parse(s)
+        assert val == symbol_a
+    else:
+        with pytest.raises(parsy.ParseError):
+            p.parse(s)
 
 
 @st.composite
