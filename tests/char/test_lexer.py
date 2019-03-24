@@ -1,5 +1,6 @@
 import operator
 import re
+from functools import partial
 
 from hypothesis import given, strategies as st
 import parsy
@@ -7,6 +8,9 @@ import pytest
 
 from megaparsy import char
 from megaparsy.char.lexer import (
+    space,
+    lexeme,
+    symbol,
     indent_block,
     indent_guard,
     IndentMany,
@@ -16,7 +20,25 @@ from megaparsy.char.lexer import (
     non_indented,
     skip_line_comment,
 )
-from megaparsy.lexer import space, lexeme, symbol
+
+
+SMALL_INT_MAX = 10
+
+symbol_a = 'aaa'
+symbol_b = 'bbb'
+symbol_c = 'ccc'
+
+sc = space(parsy.regex(r'( |\t)+').result(''))
+
+scn = space(char.space1)
+
+
+def get_col(str_):
+    """
+    Find position of first non-whitespace char in `str_`
+    """
+    # type: (str) -> int
+    return re.search(r'[^\s]', str_).start()
 
 
 def test_skip_line_comment():
@@ -31,22 +53,6 @@ def test_skip_line_comment():
     s = "// here we go\n"
     val = p.parse(s)
     assert val == "\n"
-
-
-def test_indent_guard():
-    p = indent_guard(space(), operator.gt, 4)
-
-    # too short
-    with pytest.raises(parsy.ParseError):
-        p.parse(' ' * 2)
-
-    # only equal, we requested >
-    with pytest.raises(parsy.ParseError):
-        p.parse(' ' * 4)
-
-    # indent is > 4, returns current indent
-    val = p.parse(' ' * 6)
-    assert val == 6
 
 
 def test_non_indented():
@@ -104,34 +110,6 @@ def test_line_fold(s):
     ]
 
 
-@pytest.fixture(params=[" ", "\t"])
-def whitespace_char(request):
-    return request.param
-
-
-@pytest.fixture(params=range(2, 9))
-def indent_level(request):
-    return request.param
-
-
-symbol_a = 'aaa'
-symbol_b = 'bbb'
-symbol_c = 'ccc'
-
-
-def get_col(str_):
-    """
-    Find position of first non-whitespace char in `str_`
-    """
-    # type: (str) -> int
-    return re.search(r'[^\s]', str_).start()
-
-
-sc = space(parsy.regex(r'( |\t)+').result(''))
-
-scn = space(char.space1)
-
-
 @st.composite
 def make_indent_(draw, val, size):
     """
@@ -152,7 +130,8 @@ def make_indent_(draw, val, size):
 def make_indent(draw, val, size):
     """
     Indent `val` by `size` using either space or tab, with random trailing
-    space or tab chars appended. Followed by one or more line breaks.
+    space or tab chars appended.
+    Followed by one or more line breaks.
     Will sometimes randomly ignore `size` param.
     """
     eol = draw(st.one_of(
@@ -161,6 +140,62 @@ def make_indent(draw, val, size):
     ))
     indented_val = draw(make_indent_(val, size))
     return ''.join([indented_val, eol])
+
+
+@st.composite
+def _make_indented(draw):
+    """
+    Helper strategy for `test_indent_guard` case.
+
+    The shape of the content will be the same every time:
+      a
+      a
+      a
+
+    But the chars and size of indent, plus trailing whitespace on each line
+    and number of line breaks will all be fuzzed.
+    """
+    indent_level = draw(st.integers(min_value=0, max_value=SMALL_INT_MAX))
+    return (
+        draw(make_indent(symbol_a, indent_level)),
+        draw(make_indent(symbol_a, indent_level)),
+        draw(make_indent(symbol_a, indent_level)),
+    )
+
+
+@given(_make_indented())
+def test_indent_guard(lines):
+    sp = (symbol(symbol_a, sc) << char.eol).result('')
+    ip = partial(indent_guard, scn)
+
+    @parsy.generate
+    def p():
+        x = yield ip(operator.gt, 1)
+        return (
+            sp
+            >> ip(operator.eq, x)
+            >> sp
+            >> ip(operator.gt, x)
+            >> sp
+            >> scn
+        )
+
+    s = ''.join(lines)
+
+    cols = [get_col(l) for l in lines]
+
+    if cols[0] <= 1:
+        with pytest.raises(parsy.ParseError):
+            p.parse(s)
+    elif cols[1] != cols[0]:
+        with pytest.raises(parsy.ParseError):
+            p.parse(s)
+    elif cols[2] <= cols[0]:
+        with pytest.raises(parsy.ParseError):
+            p.parse(s)
+    else:
+        val = p.parse(s)
+        assert val == ''
 
 
 @st.composite
@@ -178,7 +213,7 @@ def _make_block(draw):
     But the chars and size of indent, plus trailing whitespace on each line
     and number of line breaks will all be fuzzed.
     """
-    indent_level = draw(st.integers(min_value=1, max_value=10))
+    indent_level = draw(st.integers(min_value=1, max_value=SMALL_INT_MAX))
     lines = (
         draw(make_indent(symbol_a, 0)),
         draw(make_indent(symbol_b, indent_level)),
@@ -191,26 +226,31 @@ def _make_block(draw):
 
 @given(_make_block())
 def test_indent_block(block):
-
     lines, indent_level = block
-
-    cols = [get_col(l) for l in lines]
 
     lvlc = indent_block(
         p_space_consumer=scn,
-        p_reference=symbol(symbol_c, sc).result(IndentNone(symbol_c))
+        p_reference=symbol(symbol_c, sc).result(
+            IndentNone(symbol_c)
+        )
     )
     lvlb = indent_block(
         p_space_consumer=scn,
-        p_reference=symbol(symbol_b, sc).result(IndentSome(None, lambda l: (symbol_b, l), lvlc))
+        p_reference=symbol(symbol_b, sc).result(
+            IndentSome(None, lambda l: (symbol_b, l), lvlc)
+        )
     )
     lvla = indent_block(
         p_space_consumer=scn,
-        p_reference=symbol(symbol_a, sc).result(IndentMany(indent_level, lambda l: (symbol_a, l), lvlb))
+        p_reference=symbol(symbol_a, sc).result(
+            IndentMany(indent_level, lambda l: (symbol_a, l), lvlb)
+        )
     )
 
     s = ''.join(lines)
     p = lvla << parsy.eof
+
+    cols = [get_col(l) for l in lines]
 
     if cols[1] <= cols[0]:
         with pytest.raises(parsy.ParseError):

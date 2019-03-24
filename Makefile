@@ -1,4 +1,4 @@
-.PHONY: pypi, tag, test
+.PHONY: pypi, tag, test, shell
 
 pypi:
 	rm -f dist/*
@@ -7,8 +7,11 @@ pypi:
 	make tag
 
 tag:
-	git tag $$(python -c "from megaparsy.__about__ import __version__; print __version__")
+	git tag $$(python -c "from megaparsy.__about__ import __version__; print(__version__)")
 	git push --tags
 
 test:
-	py.test -v -s --ipdb tests/
+	py.test -v -s --pdb tests/
+
+shell:
+	PYTHONPATH=megaparsy:tests:$$PYTHONPATH ipython

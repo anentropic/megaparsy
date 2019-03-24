@@ -1,8 +1,7 @@
 import parsy
 import pytest
 
-from megaparsy.lexer import space, lexeme, symbol
-from megaparsy.char.lexer import skip_line_comment
+from megaparsy.char.lexer import space, lexeme, symbol, skip_line_comment
 
 
 @pytest.mark.parametrize('s', [

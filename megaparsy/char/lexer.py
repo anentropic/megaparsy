@@ -3,8 +3,64 @@ from collections import namedtuple
 
 import parsy
 
-from megaparsy.char import eol
+from megaparsy import char
 from megaparsy.utils import try_, from_maybe
+
+
+OPERATOR_MAP = {
+    operator.eq: '==',
+    operator.gt: '>',
+    operator.lt: '<',
+}
+
+
+def space(
+    p_space=char.space,
+    p_line_comment=parsy.fail('line-comment'),
+    p_block_comment=parsy.fail('block-comment')
+):
+    """
+    Produces a parser that consumes white space in general. It's expected
+    that you create such a parser once and pass it to other functions in this
+    package as needed (when you see `p_space_consumer` in documentation,
+    usually it means that something like `space()` is expected there).
+
+    Args:
+        p_space_chars: is used to parse blocks of space characters.
+            You can use 'char.space' for this purpose, or your own parser
+            (if you don't want to automatically consume newlines, for example).
+            Make sure the parser does not succeed on empty input though.
+        p_line_comment: is used to parse line comments. You can use
+            'megaparsy.skip_line_comment` if you don't need anything special.
+        p_block_comment: is used to parse block (multi-line) comments. You can
+            use `megaparsy.skip_block_comment` or `skip_block_comment_nested`
+            if you don't need anything special.
+
+    If you don't want to match a kind of comment, simply pass `parsy.fail()`
+    and `space` will just move on or finish depending on whether there is more
+    white space for it to consume.
+    """
+    return parsy.success('')\
+        .skip(p_space.optional())\
+        .skip(p_line_comment.optional())\
+        .skip(p_block_comment.optional())
+
+
+def lexeme(p_lexeme, p_space=char.space):
+    """
+    This is a wrapper for "lexemes". Typical usage is to supply the first
+    argument (parser that consumes white space, e.g. `megaparsy.space()`)
+    and use the resulting function to wrap parsers for every lexeme.
+
+    Args:
+        p_lexeme: parser that matches a single lexemes
+        p_space: space parser, i.e. delimiting end of lexeme
+    """
+    return p_lexeme << p_space
+
+
+def symbol(symbol, p_space=char.space):
+    return lexeme(parsy.string(symbol), p_space=p_space)
 
 
 def skip_line_comment(prefix):
@@ -22,13 +78,6 @@ def skip_line_comment(prefix):
 # TODO: skip_block_comment
 
 
-OPERATOR_MAP = {
-    operator.eq: '==',
-    operator.gt: '>',
-    operator.lt: '<',
-}
-
-
 def indent_guard(p_space_consumer, operator, reference_level):
     """
     `indent_guard` first consumes all white space (indentation) with
@@ -39,7 +88,7 @@ def indent_guard(p_space_consumer, operator, reference_level):
 
     When you want to parse a block of indentation, first run this parser with
     arguments like `indentGuard(space, operator.gt, 4)` this will make
-    sure you have some indentation. Use returned value to check indentation
+    sure you have indentation > 4. Use returned value to check indentation
     on every subsequent line according to syntax of your language.
 
     Args:
@@ -212,7 +261,7 @@ def indent_block(p_space_consumer, p_reference):
             # level (if 'Nothing', use level of the first indented token)
             maybe_indent, f, p = indent_opt
             p_indent_guard = indent_guard(p_space_consumer, operator.gt, ref_level)
-            maybe_lvl = yield try_(eol >> p_indent_guard).optional()
+            maybe_lvl = yield try_(char.eol >> p_indent_guard).optional()
             done = yield (parsy.eof.result(True)).optional()
             if not done and maybe_lvl is not None:
                 next_level = from_maybe(maybe_lvl, maybe_indent)
@@ -228,7 +277,7 @@ def indent_block(p_space_consumer, p_reference):
             # to be present
             maybe_indent, f, p = indent_opt
             p_indent_guard = indent_guard(p_space_consumer, operator.gt, ref_level)
-            pos = yield eol >> p_indent_guard
+            pos = yield char.eol >> p_indent_guard
             lvl = from_maybe(pos, maybe_indent)
             if pos <= ref_level:
                 parsy.fail(
