@@ -9,7 +9,6 @@ import pytest
 from megaparsy import char
 from megaparsy.char.lexer import (
     space,
-    lexeme,
     symbol,
     indent_block,
     indent_guard,
@@ -32,6 +31,8 @@ sc = space(parsy.regex(r'( |\t)+').result(''))
 
 scn = space(char.space1)
 
+whitespace_char = st.text(' \t', min_size=1, max_size=1)
+
 
 def get_col(str_):
     """
@@ -39,6 +40,55 @@ def get_col(str_):
     """
     # type: (str) -> int
     return re.search(r'[^\s]', str_).start()
+
+
+@st.composite
+def make_indent_(draw, val, size):
+    """
+    Indent `val` by `size` using either space or tab, with random trailing
+    space or tab chars appended.
+    Will sometimes randomly ignore `size` param.
+    """
+    trailing = draw(st.text(draw(whitespace_char)))
+    indent = draw(st.one_of(
+        st.text(draw(whitespace_char), min_size=size, max_size=size),
+        st.text(draw(whitespace_char)),
+    ))
+    return ''.join([indent, val, trailing])
+
+
+@st.composite
+def make_indent(draw, val, size):
+    """
+    Indent `val` by `size` using either space or tab, with random trailing
+    space or tab chars appended.
+    Followed by one or more line breaks.
+    Will sometimes randomly ignore `size` param.
+    """
+    eol = draw(st.one_of(
+        st.text('\n', min_size=1, max_size=1),
+        st.text('\n', min_size=1),
+    ))
+    indented_val = draw(make_indent_(val, size))
+    return ''.join([indented_val, eol])
+
+
+@st.composite
+def make_interspace(draw, val, size):
+    """
+    Returns `val` either indented or with trailing whitespace (?)
+
+    mkInterspace :: String -> Int -> Gen String
+    mkInterspace val size = oneof [si, mkIndent val size]
+      where
+        si = (++ val) <$> listOf (elements " \t")
+    """
+    si = st.text(draw(whitespace_char)).flatmap(
+        lambda _interspace: st.just(val + _interspace)
+    )
+    return draw(st.one_of(
+        si, make_indent(val, size)
+    ))
 
 
 def test_skip_line_comment():
@@ -75,71 +125,63 @@ one
         p.parse(s)
 
 
-@pytest.mark.parametrize('s', [
-    """one
-    two
-    three
-        four
-five""",
-    """    one
-        two
-        three
-            four
-    five""",
-])
-def test_line_fold(s):
+@st.composite
+def _make_fold(draw):
+    """
+    Helper strategy for `test_line_fold` case.
+
+    The shape of the content will be the same every time:
+      a
+      b
+      c
+
+    But the chars and size of indent, plus trailing whitespace on each line
+    and number of line breaks will all be fuzzed.
+    """
+    return (
+        draw(make_interspace(symbol_a, 0)),
+        draw(make_interspace(symbol_b, 1)),
+        draw(make_interspace(symbol_c, 1)),
+    )
+
+
+@given(_make_fold())
+def test_line_fold(lines):
     """
     `line_fold` collects all items matching the parser returned from your
-    callback which are at a greater indent than the start position.
+    callback, and which are at a greater indent than the start position.
     """
 
     def callback(sc_):
         @parsy.generate
         def parser():
-            return (yield lexeme(parsy.regex(r'\w+'), sc_).many())
+            a = yield symbol(symbol_a, sc_)
+            b = yield symbol(symbol_b, sc_)
+            c = yield symbol(symbol_c, scn)
+            return a, b, c
 
         return parser
 
-    p = line_fold(space(), callback) << parsy.regex(r'\w+')  # discard the 'five'
-    val = p.parse(s)
-    assert val == [
-        'one',
-        'two',
-        'three',
-        'four',
-    ]
+    p = line_fold(scn, callback)
 
+    s = ''.join(lines)
 
-@st.composite
-def make_indent_(draw, val, size):
-    """
-    Indent `val` by `size` using either space or tab, with random trailing
-    space or tab chars appended.
-    Will sometimes randomly ignore `size` param.
-    """
-    whitespace_char = st.text(' \t', min_size=1, max_size=1)
-    trailing = draw(st.text(draw(whitespace_char)))
-    indent = draw(st.one_of(
-        st.text(draw(whitespace_char), min_size=size, max_size=size),
-        st.text(draw(whitespace_char)),
-    ))
-    return ''.join([indent, val, trailing])
+    cols = [get_col(l) for l in lines]
+    ends = [l.endswith('\n') for l in lines]
 
-
-@st.composite
-def make_indent(draw, val, size):
-    """
-    Indent `val` by `size` using either space or tab, with random trailing
-    space or tab chars appended.
-    Followed by one or more line breaks.
-    Will sometimes randomly ignore `size` param.
-    """
-    eol = draw(st.one_of(
-        st.text('\n', min_size=1, max_size=1),
-        st.text('\n', min_size=1),
-    ))
-    indented_val = draw(make_indent_(val, size))
-    return ''.join([indented_val, eol])
+    if ends[0] and cols[1] <= cols[0]:
+        with pytest.raises(parsy.ParseError):
+            p.parse(s)
+    elif ends[1] and cols[2] <= cols[0]:
+        with pytest.raises(parsy.ParseError):
+            p.parse(s)
+    else:
+        val = p.parse(s)
+        assert val == (
+            symbol_a,
+            symbol_b,
+            symbol_c,
+        )
 
 
 @st.composite
