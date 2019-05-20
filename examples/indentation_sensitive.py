@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import argparse
 import os
 import sys
 from functools import partial
@@ -6,10 +7,11 @@ from functools import partial
 sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 import parsy
-from megaparsy.lexer import space, lexeme as megaparsy_lexeme
 from megaparsy import char
 from megaparsy.char.lexer import (
     indent_block,
+    space,
+    lexeme as megaparsy_lexeme,
     IndentMany,
     IndentSome,
     line_fold,
@@ -43,6 +45,7 @@ def _line_fold_callback(sc_):
     def parser():
         items = yield p_item_factory(sc_).many()
         return ' '.join(items)
+    return parser
 
 
 p_line_fold = line_fold(scn, _line_fold_callback)
@@ -74,7 +77,17 @@ parser = p_item_list << parsy.eof
 
 
 if __name__ == "__main__":
-    input_ = sys.argv[1]
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument(
+        'file_to_parse',
+        default=sys.stdin,
+        type=argparse.FileType('r'),
+        nargs='?',
+    )
+    args = argparser.parse_args()
+
+    input_ = args.file_to_parse.read()
     print(input_)
+
     val = parser.parse(input_)
     print(val)
