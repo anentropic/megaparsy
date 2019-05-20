@@ -249,6 +249,7 @@ def indent_block(p_space_consumer, p_reference):
             TypeError: if `p_reference` does not return one of
                 IndentNone | IndentMany | IndentSome
         """
+        _ = yield p_space_consumer
         _, ref_level = yield parsy.line_info
         indent_opt = yield p_reference
 
@@ -257,8 +258,8 @@ def indent_block(p_space_consumer, p_reference):
             return p_space_consumer.result(indent_opt.val)
 
         elif isinstance(indent_opt, IndentMany):
-            # Parse many indented tokens (possibly zero), use given indentation
-            # level (if 'Nothing', use level of the first indented token)
+            # Parse none-or-many indented tokens, use given indentation
+            # level (if `None`, use level of the first indented token)
             maybe_indent, f, p = indent_opt
             p_indent_guard = indent_guard(p_space_consumer, operator.gt, ref_level)
             maybe_lvl = yield try_(char.eol >> p_indent_guard).optional()
@@ -273,7 +274,7 @@ def indent_block(p_space_consumer, p_reference):
                 return p_space_consumer >> f([])
 
         elif isinstance(indent_opt, IndentSome):
-            # Just like 'IndentMany', but requires at least one indented token
+            # Just like `IndentMany`, but requires at least one indented token
             # to be present
             maybe_indent, f, p = indent_opt
             p_indent_guard = indent_guard(p_space_consumer, operator.gt, ref_level)

@@ -88,12 +88,7 @@ def make_indent(draw, val, size):
 @st.composite
 def make_interspace(draw, val, size):
     """
-    Returns `val` either indented or with trailing whitespace (?)
-
-    mkInterspace :: String -> Int -> Gen String
-    mkInterspace val size = oneof [si, mkIndent val size]
-      where
-        si = (++ val) <$> listOf (elements " \t")
+    Returns `val` either indented or with trailing whitespace (fuzzed).
     """
     si = st.text(draw(whitespace_char)).flatmap(
         lambda _interspace: st.just(val + _interspace)
@@ -307,7 +302,7 @@ def test_indent_block(block):
     if cols[1] <= cols[0]:
         with pytest.raises(parsy.ParseError):
             p.parse(s)
-    elif indent_level is not None and cols[1] != indent_level:
+    elif indent_level and cols[1] != indent_level:
         with pytest.raises(parsy.ParseError):
             p.parse(s)
     elif cols[2] <= cols[1]:

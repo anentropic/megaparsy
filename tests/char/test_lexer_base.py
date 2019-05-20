@@ -12,7 +12,9 @@ from megaparsy.char.lexer import space, lexeme, symbol, skip_line_comment
     '\t  ',
 ])
 def test_space(s):
-    # whitespace is consumed
+    """
+    any sort of whitespace is consumed
+    """
     scn = space()
     val = scn.parse(s)
     assert val == ''
@@ -26,7 +28,9 @@ def test_space(s):
     ('\t  ', 'x y'),
 ])
 def test_space2(s0, s1):
-    # following non-whitespace is not consumed
+    """
+    following non-whitespace is not consumed
+    """
     p = space() + parsy.regex(r'.*')
     val = p.parse(s0 + s1)
     assert val == s1
@@ -40,8 +44,10 @@ def test_space2(s0, s1):
     ('\t  ', '// comment'),
 ])
 def test_space3(s0, s1):
-    # we allow comment parser to do its thing
-    # (in this case: skips comment)
+    """
+    we allow comment parser to do its thing
+    (in this case: skips comment)
+    """
     p = space(p_line_comment=skip_line_comment('//'))
     val = p.parse(s0 + s1)
     assert val == ''
@@ -62,6 +68,10 @@ def test_lexeme():
 
 
 def test_symbol():
+    """
+    when stream begins with the symbol it parses the symbol and
+    trailing whitespace
+    """
     p = symbol('foo').many()
     s = "foo foo\nfoo "
     val = p.parse(s)

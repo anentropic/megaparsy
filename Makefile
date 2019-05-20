@@ -11,7 +11,7 @@ tag:
 	git push --tags
 
 test:
-	py.test -v -s --pdb tests/
+	py.test -v -s --pdb --pdbcls=IPython.terminal.debugger:TerminalPdb tests/
 
 shell:
 	PYTHONPATH=megaparsy:tests:$$PYTHONPATH ipython
