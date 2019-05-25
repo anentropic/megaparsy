@@ -185,7 +185,7 @@ def _indented_items(reference_level, next_level, p_space_consumer, p_indented_to
 IndentNone = namedtuple('IndentNone', ('val',))
 IndentMany = namedtuple('IndentMany', ('indent', 'f', 'p'))
 IndentSome = namedtuple('IndentSome', ('indent', 'f', 'p'))
-# f(List[str]) -> ?
+# where `f` is Callable[[List[str]], str] returning str result
 
 
 def indent_block(p_space_consumer, p_reference):
@@ -271,7 +271,7 @@ def indent_block(p_space_consumer, p_reference):
                 )
                 return f(vals)
             else:
-                return p_space_consumer >> f([])
+                return p_space_consumer.result(f([]))
 
         elif isinstance(indent_opt, IndentSome):
             # Just like `IndentMany`, but requires at least one indented token
