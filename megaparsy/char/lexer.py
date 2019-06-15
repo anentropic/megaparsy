@@ -124,8 +124,6 @@ def non_indented(p_space_consumer, p_content):
     -- | Parse a non-indented construction. This ensures that there is no
     -- indentation before actual data. Useful, for example, as a wrapper for
     -- top-level function definitions.
-    --
-    -- @since 4.3.0
 
     nonIndented :: MonadParsec e s m
       => m ()              -- ^ How to consume indentation (white space)
