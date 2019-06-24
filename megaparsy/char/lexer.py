@@ -48,7 +48,7 @@ def space(
 
 def lexeme(p_lexeme, p_space=char.space):
     """
-    This is a wrapper for "lexemes". Typical usage is to supply the first
+    This is a wrapper for "lexemes". Typical usage is to supply the `p_space`
     argument (parser that consumes white space, e.g. `megaparsy.space()`)
     and use the resulting function to wrap parsers for every lexeme.
 
@@ -247,7 +247,7 @@ def indent_block(p_space_consumer, p_reference):
             TypeError: if `p_reference` does not return one of
                 IndentNone | IndentMany | IndentSome
         """
-        _ = yield p_space_consumer
+        yield p_space_consumer
         _, ref_level = yield parsy.line_info
         indent_opt = yield p_reference
 
