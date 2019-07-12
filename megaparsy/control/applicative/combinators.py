@@ -13,11 +13,17 @@ def between(p_open, p_close, p):
     return p_open >> p << p_close
 
 
-@parsy.generate
-def nested(p_open, p_close, p_token):
+def nested(p_open, p_close, p_token, p_sep_by):
 
     @parsy.generate
-    def _nested_(p_open, p_close):
-        return (yield between(p_open, p_close, nested))
+    def group():
+        return (
+            yield between(
+                p_open,
+                p_close,
+                expr.sep_by(p_sep_by),
+            )
+        )
 
-    return (yield p_token | _nested_(p_open, p_close))
+    expr = p_token | group
+    return expr

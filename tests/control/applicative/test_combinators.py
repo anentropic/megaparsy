@@ -4,7 +4,7 @@ from hypothesis import given, strategies as st
 import parsy
 import pytest
 
-from megaparsy.control.applicative.combinators import between
+from megaparsy.control.applicative.combinators import between, nested
 
 from tests.helpers import prs_
 
@@ -51,3 +51,14 @@ def test_between(pre, c, n, post):
     else:
         result = prs_(p)(val)
         assert result == [c_ for c_ in token]
+
+
+def test_nested_basic():
+    p = nested(
+        parsy.string('('),
+        parsy.string(')'),
+        parsy.regex('[0-9]+').map(int),
+        parsy.string(' '),
+    )
+    result = p.parse("(0 1 (2 3) (4 5 6) 7 8)")
+    assert result == [0, 1, [2, 3], [4, 5, 6], 7, 8]
