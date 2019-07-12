@@ -49,5 +49,7 @@ setup(
     packages=[
         'megaparsy',
         'megaparsy.char',
+        'megaparsy.control',
+        'megaparsy.control.applicative',
     ],
 )
