@@ -40,7 +40,7 @@ Nicely and simply explained here:
 
    *Functional or Combinator Parsing explained by Professor Graham Hutton.*
 
-So here I have ported a bunch of the Megaparsec combinators over to Parsy. It is surprising how smoothly it went and how similar they come out - this is testament to the genius of Parsy, which is where all the clever part is.
+So in *Megaparsy* I have ported a bunch of the Megaparsec combinators over to Parsy. It is surprising how smoothly it went and how similar they come out - this is testament to the genius of Parsy, which is where all the clever part is.
 
 (I haven't done all of them yet, but the indentation-sensitive ones are here)
 
