@@ -32,12 +32,12 @@ So in Haskell-land we can find 'Monadic Parser Combinators', which do not have t
 
 But... it was difficult for me to learn to make a parser for the first time *and* learn Haskell simultaneously. So I looked around for a Python option and found the  brilliant `Parsy <https://parsy.readthedocs.io/en/latest/>`_ library. It provides an implementation of 'Monadic Parser Combinators' in Python.
 
-   Nicely and simply explained here:
+Nicely and simply explained here:
 
 .. figure:: http://img.youtube.com/vi/dDtZLm7HIJs/0.jpg
    :alt: Functional or Combinator Parsing explained by Professor Graham Hutton.
    :target: http://www.youtube.com/watch?v=dDtZLm7HIJs
-   
+
    *Functional or Combinator Parsing explained by Professor Graham Hutton.*
 
 So here I have ported a bunch of the Megaparsec combinators over to Parsy. It is surprising how smoothly it went and how similar they come out - this is testament to the genius of Parsy, which is where all the clever part is.
