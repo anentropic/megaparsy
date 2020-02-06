@@ -51,6 +51,7 @@ def lexeme(p_lexeme, p_space=char.space):
     This is a wrapper for "lexemes". Typical usage is to supply the `p_space`
     argument (parser that consumes white space, e.g. `megaparsy.space()`)
     and use the resulting function to wrap parsers for every lexeme.
+    (basically: consumes trailing whitespace after a token)
 
     Args:
         p_lexeme: parser that matches a single lexemes
