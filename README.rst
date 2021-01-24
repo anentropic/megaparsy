@@ -20,7 +20,7 @@ megaparsy
     :alt: Python 3.8
 
 
-Work In Progress - ignore for now ;)
+Work In Progress - what is here is tested and works but nothing is documented yet, sorry.
 
 Initial motivation for this project was to build an indentation-sensitive parser. This is problematic for any parser library which is limited to expressing context-free grammars (which is most of them), unless you use a separate pre-processing step (like e.g. the parser for the Python language does).
 
