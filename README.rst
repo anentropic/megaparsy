@@ -20,17 +20,17 @@ megaparsy
     :alt: Python 3.8
 
 
-Work In Progress - what is here is tested and works but nothing is documented yet, sorry.
+(Work In Progress - what is here is tested and works but nothing is documented yet, sorry.)
 
-Initial motivation for this project was to build an indentation-sensitive parser. This is problematic for any parser library which is limited to expressing context-free grammars (which is most of them), unless you use a separate pre-processing step (like e.g. the parser for the Python language does).
+This is a port of some of the parser-combinators from Haskell's `Megaparsec <https://hackage.haskell.org/package/megaparsec>`_ library into Python. For use with the `Parsy <https://parsy.readthedocs.io/en/latest/>`_ parser library for Python.
+
+My motivation for this project was to build an indentation-sensitive parser. This is problematic for any parser library which is limited to expressing only context-free grammars (which is most of them), unless you use a separate pre-processing step (like e.g. the parser for the Python language does).
 
 Googling around this topic I came upon `<https://markkarpov.com/tutorial/megaparsec.html#indentationsensitive-parsing>`_
 
-So in Haskell-land we can find 'Monadic Parser Combinators', which do not have this restriciton to CFGs. And the `Megaparsec <https://hackage.haskell.org/package/megaparsec>`_ library defines many useful combinators, including some which designed specifically to help with building indentation-sensitive parsers.
+So in Haskell-land we can find 'Monadic Parser Combinators', which do not have this restriction to CFGs. And Megaparsec defines many useful combinators, including some which are designed specifically to help with building indentation-sensitive parsers.
 
-But... it was difficult for me to learn to make a parser for the first time *and* learn Haskell simultaneously. So I looked around for a Python option and found the  brilliant `Parsy <https://parsy.readthedocs.io/en/latest/>`_ library. It provides an implementation of 'Monadic Parser Combinators' in Python.
-
-Nicely and simply explained here:
+Parser-combinators are nicely and simply explained in this YouTube video:
 
 .. figure:: http://img.youtube.com/vi/dDtZLm7HIJs/0.jpg
    :alt: Functional or Combinator Parsing explained by Professor Graham Hutton.
@@ -38,8 +38,6 @@ Nicely and simply explained here:
 
    *Functional or Combinator Parsing explained by Professor Graham Hutton.*
 
-So in *Megaparsy* I have ported a bunch of the Megaparsec combinators over to Parsy. It is surprising how smoothly it went and how similar they come out - this is testament to the genius of Parsy, which is where all the clever part is.
+So in *Megaparsy* I have ported a bunch of the Megaparsec combinators over to Parsy. (I haven't done all of them yet, but the indentation-sensitive ones are here).
 
-(I haven't done all of them yet, but the indentation-sensitive ones are here)
-
-I've also roughly translated across the property-based tests from their Haskell QuickCheck originals into Python `Hypothesis <https://hypothesis.readthedocs.io/en/latest/>`_ ones.
+I've also translated across the property-based tests from their Haskell QuickCheck originals into Python `Hypothesis <https://hypothesis.readthedocs.io/en/latest/>`_ ones.
