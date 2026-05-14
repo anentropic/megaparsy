@@ -43,7 +43,7 @@ setup(
         'Topic :: Text Processing',
     ],
     install_requires=[
-        'parsy>=1.2.0,<1.3.0',
+        'parsy>=1.2.0,<2.2',
     ],
 
     packages=[
